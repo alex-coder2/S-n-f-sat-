@@ -2,10 +2,10 @@ from flask import Flask, request, render_template_string, redirect, session
 import os
 
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'super_gizli_anahtar_2025_knk')
+app.secret_key = os.getenv('SECRET_KEY', 'super_gizli_anahtar')
 
 # Şifreyi buradan değiştir (güçlü olsun!)
-ADMIN_SIFRE = "sinif123"  # <--- BURAYI DEĞİŞTİR, İSTEDİĞİN ŞİFRE !!!
+ADMIN_SIFRE = "Vortex1453"  # <--- BURAYI DEĞİŞTİR, İSTEDİĞİN ŞİFRE !!!
 
 # Ürünler artık sabit değil, dinamik (admin ekleyecek)
 urunler = [
