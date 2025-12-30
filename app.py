@@ -1,35 +1,29 @@
-from flask import Flask, request, render_template_string
-from twilio.rest import Client
+from flask import Flask, request, render_template_string, redirect, url_for, session
 import os
 
 app = Flask(__name__)
 
-# Twilio ayarları - Render Environment Variables'tan çekiyoruz
-TWILIO_SID = os.getenv('TWILIO_SID')
-TWILIO_TOKEN = os.getenv('TWILIO_TOKEN')
-MESSAGING_SERVICE_SID = os.getenv('MESSAGING_SERVICE_SID')  # MG7edc83f39d571739e3dfece9c46334a9
-ADMIN_NUMARASI = os.getenv('ADMIN_NUMARASI')  # +90 ile senin numaran
+# Flask için secret key (güvenlik için, rastgele olsun)
+app.secret_key = os.getenv('SECRET_KEY', 'super_gizli_anahtar')  # Render'da değişken olarak koyabilirsin
 
-# Twilio client
-client = Client(TWILIO_SID, TWILIO_TOKEN)
+# Şifreyi buraya yaz (istediğin şifreyi koy, mesela "sinif123")
+ADMIN_SIFRE = "Vortex1453"  # <--- BURAYI DEĞİŞTİR, İSTEDİĞİN ŞİFREYİ YAZ !!!
 
-# Ürün listesi - istediğin kadar ekleyebilirsin
 urunler = [
     {"id": 1, "ad": "10. Sınıf Fizik Kitabı", "fiyat": "100 TL", "satici": "Ali"},
     {"id": 2, "ad": "Kablosuz Kulaklık", "fiyat": "300 TL", "satici": "Ayşe"},
-    {"id": 3, "ad": "Matematik Notları (Fotokopi)", "fiyat": "50 TL", "satici": "Mehmet"},
+    {"id": 3, "ad": "Matematik Notları", "fiyat": "50 TL", "satici": "Mehmet"},
     {"id": 4, "ad": "Elden PS4 Kol", "fiyat": "500 TL", "satici": "Can"},
-    {"id": 5, "ad": "Yedek Şarj Aleti", "fiyat": "150 TL", "satici": "Zeynep"},
 ]
 
-# Siparişleri hafızada tut (restart olursa silinir, sınıf için yeterli)
-siparisler = []
+bekleyen_siparisler = []
+onaylanan_siparisler = []
 
 @app.route('/')
 def ana_sayfa():
     return render_template_string('''
     <h1 style="text-align:center; color:#2c3e50; margin-top:30px;">📚 Sınıf Satış</h1>
-    <p style="text-align:center; font-size:18px;">Sadece bizim sınıf kullanır • Elden veya IBAN ile ödeme 😎</p>
+    <p style="text-align:center; font-size:18px;">Elden veya IBAN ile • Sadece bizim sınıf 😎</p>
     
     <div style="max-width:700px; margin:auto; padding:10px;">
     {% for urun in urunler %}
@@ -58,7 +52,7 @@ def ana_sayfa():
     </div>
     
     <footer style="text-align:center; margin:40px 0; color:#95a5a6;">
-        Sınıfın ikinci el pazarı • Güvenli alışveriş knklar ❤️
+        Güvenli alışveriş knklar ❤️
     </footer>
     ''', urunler=urunler)
 
@@ -66,85 +60,119 @@ def ana_sayfa():
 def siparis_ver(urun_id):
     urun = next((u for u in urunler if u['id'] == urun_id), None)
     if not urun:
-        return "<h2>Ürün bulunamadı!</h2><a href='/'>← Geri dön</a>"
+        return "Ürün bulunamadı!"
 
     isim = request.form['isim'].strip()
-    odeme_secimi = request.form['odeme']
-    odeme_metni = "IBAN ile" if odeme_secimi == "iban" else "Elden"
+    odeme = "IBAN ile" if request.form['odeme'] == "iban" else "Elden"
 
-    # Siparişi kaydet
     yeni_siparis = {
         "urun": urun['ad'],
         "fiyat": urun['fiyat'],
         "alan": isim,
-        "odeme": odeme_metni,
+        "odeme": odeme,
         "satici": urun['satici']
     }
-    siparisler.append(yeni_siparis)
-
-    # Sana SMS gönder
-    try:
-        mesaj = f"""🚨 YENİ SİPARİŞ KNKK!
-
-Ürün: {yeni_siparis['urun']}
-Fiyat: {yeni_siparis['fiyat']}
-Alan Kişi: {isim}
-Ödeme Şekli: {odeme_metni}
-Satıcı: {yeni_siparis['satici']}
-
-Onaylamak için bu mesaja sadece 'X' yazıp gönder."""
-
-        client.messages.create(
-            messaging_service_sid=MESSAGING_SERVICE_SID,
-            body=mesaj,
-            to=ADMIN_NUMARASI
-        )
-        sms_durum = "✅ SMS başarıyla gönderildi! Yakında sana bildirim gelecek."
-    except Exception as e:
-        sms_durum = f"⚠️ SMS gönderilirken hata oldu: {str(e)}<br>Ama sipariş kaydedildi, manuel kontrol et."
+    bekleyen_siparisler.append(yeni_siparis)
 
     return f'''
     <div style="text-align:center; margin:50px; font-size:18px;">
         <h2 style="color:#27ae60;">✅ Sipariş alındı {isim}!</h2>
-        <p>Satıcıya bilgi verildi.<br>
-        <b>{odeme_metni}</b> şeklinde ödeme yapacaksın.</p>
-        <p>{sms_durum}</p>
-        <br>
+        <p>Satıcıyla görüş, <b>{odeme}</b> şeklinde ödeme yap.<br><br>
+        Admin onaylayınca işlem tamamlanır 😊</p>
         <a href="/" style="padding:12px 24px; background:#3498db; color:white; text-decoration:none; border-radius:8px;">← Ana Sayfaya Dön</a>
     </div>
     '''
 
-# Sen "X" yazınca onaylama webhook'u
-@app.route('/sms_webhook', methods=['POST'])
-def sms_webhook():
-    gelen_mesaj = request.values.get('Body', '').strip().upper()
-    gonderen_numara = request.values.get('From')
+# Admin giriş sayfası
+@app.route('/admin_login', methods=['GET', 'POST'])
+def admin_login():
+    hata = None
+    if request.method == 'POST':
+        sifre = request.form['sifre']
+        if sifre == ADMIN_SIFRE:
+            session['logged_in'] = True
+            return redirect('/admin')
+        else:
+            hata = "Yanlış şifre knk! Tekrar dene."
 
-    if gonderen_numara == ADMIN_NUMARASI and gelen_mesaj == 'X' and siparisler:
-        son_siparis = siparisler[-1]
-        
-        onay_mesaj = f"""✅ SİPARİŞ ONAYLANDI!
+    return render_template_string('''
+    <div style="text-align:center; margin:100px auto; max-width:400px;">
+        <h2>🔐 Admin Girişi</h2>
+        {% if hata %}
+            <p style="color:red;">{{ hata }}</p>
+        {% endif %}
+        <form method="post">
+            <input type="password" name="sifre" placeholder="Şifreyi gir" required 
+                   style="width:100%; padding:12px; margin:15px 0; border-radius:8px; font-size:18px;"><br>
+            <button type="submit" 
+                    style="width:100%; padding:14px; background:#2ecc71; color:white; border:none; border-radius:8px; font-size:18px;">
+                Giriş Yap
+            </button>
+        </form>
+        <br><a href="/">← Ana Sayfa</a>
+    </div>
+    ''')
 
-{son_siparis['alan']} adlı kişi
-{son_siparis['urun']} ürününü aldı.
+# Admin paneli (şifre kontrolü var)
+@app.route('/admin')
+def admin_panel():
+    if not session.get('logged_in'):
+        return redirect('/admin_login')
 
-Ödeme: {son_siparis['odeme']}
-Satıcı: {son_siparis['satici']}
+    return render_template_string('''
+    <div style="max-width:800px; margin:auto; padding:20px;">
+        <h1 style="text-align:center;">🔐 Admin Paneli</h1>
+        <p style="text-align:center;"><a href="/admin_cikis">Çıkış yap</a></p>
 
-Hayırlı olsun knk! 🎉"""
+        <h2 style="color:#e67e22;">Bekleyen Siparişler ({{ bekleyen|length }})</h2>
+        {% if bekleyen %}
+            {% for s in bekleyen %}
+                <div style="background:#fff; border:1px solid #ccc; padding:15px; margin:15px 0; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+                    <b>Ürün:</b> {{ s.urun }} ({{ s.fiyat }})<br>
+                    <b>Alan Kişi:</b> {{ s.alan }}<br>
+                    <b>Ödeme:</b> {{ s.odeme }}<br>
+                    <b>Satıcı:</b> {{ s.satici }}<br><br>
+                    <form action="/onayla/{{ loop.index0 }}" method="post" style="display:inline;">
+                        <button type="submit" style="background:#27ae60; color:white; padding:10px 20px; border:none; border-radius:5px; cursor:pointer;">✅ Onayla</button>
+                    </form>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>Şu an bekleyen sipariş yok knk 😎</p>
+        {% endif %}
 
-        try:
-            client.messages.create(
-                messaging_service_sid=MESSAGING_SERVICE_SID,
-                body=onay_mesaj,
-                to=ADMIN_NUMARASI
-            )
-        except:
-            pass  # Onay SMS'i başarısız olsa bile devam
+        <h2 style="color:#27ae60;">Onaylanan Siparişler</h2>
+        {% if onaylanan %}
+            {% for s in onaylanan %}
+                <div style="background:#e8f5e8; padding:12px; margin:10px 0; border-radius:8px;">
+                    ✅ {{ s.alan }} → {{ s.urun }} ({{ s.odeme }})
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>Henüz onaylanan sipariş yok.</p>
+        {% endif %}
 
-    return '', 200
+        <br><a href="/">← Ana Sayfa</a>
+    </div>
+    ''', bekleyen=bekleyen_siparisler, onaylanan=onaylanan_siparisler)
 
-# Render için port ayarı
+# Onaylama
+@app.route('/onayla/<int:index>', methods=['POST'])
+def onayla(index):
+    if not session.get('logged_in'):
+        return redirect('/admin_login')
+    
+    if 0 <= index < len(bekleyen_siparisler):
+        onaylanan = bekleyen_siparisler.pop(index)
+        onaylanan_siparisler.append(onaylanan)
+    
+    return redirect('/admin')
+
+# Çıkış
+@app.route('/admin_cikis')
+def admin_cikis():
+    session.pop('logged_in', None)
+    return redirect('/')
+
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
