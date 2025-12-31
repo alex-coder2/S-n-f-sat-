@@ -132,7 +132,7 @@ def ana_sayfa():
             </div>
             """
     
-    html += "<footer>Sınıfın Karanlık Pazarı • 2025 ❤️</footer></div>"
+    html += "<footer>GBAL'ın Resmi Pazarı • 2026 </footer></div>"
     return html
 
 @app.route('/siparis/<int:urun_id>', methods=['POST'])
