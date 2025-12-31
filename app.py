@@ -1,29 +1,28 @@
-
 from flask import Flask, request, render_template_string, redirect, session
 import os
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'vortex_gizli_anahtar_1453_2025')
 
-# Admin şifresi (istediğin gibi değiştirilebilir ama şu an Vortex1453)
+# Admin şifresi
 ADMIN_SIFRE = "Vortex1453"
 
-# Senin IBAN bilgilerin (burayı kendi IBAN'ınla doldur)
+# Senin IBAN bilgilerin (kendi bilgilerini yaz!)
 IBAN_BILGISI = """
 <b>IBAN:</b> TR350006400000163002969560<br>
 <b>Alıcı Adı:</b> Haşim Seviniş<br>
-<b>Banka:</b> Ziraat Bankası <br><br>
+<b>Banka:</b> Ziraat Bankası<br><br>
 <span style="color:red; font-weight:bold;">
-⚠️ Mutlaka açıklama kısmına ADINIZI ve SOYADINIZI yazın!<br>
-Yoksa para geri döner ve sipariş geçersiz sayılır!
+⚠️ Açıklama kısmına MUTLAKA ADINIZI ve SOYADINIZI yazın!<br>
+Yazmazsanız para geri döner ve sipariş geçersiz sayılır!
 </span>
 """
 
-# Dinamik ürün listesi
+# Ürünler artık stoklu
 urunler = [
-    {"id": 1, "ad": "10. Sınıf Fizik Kitabı", "fiyat": "100 TL", "satici": "Ali"},
-    {"id": 2, "ad": "Kablosuz Kulaklık", "fiyat": "300 TL", "satici": "Ayşe"},
-    {"id": 3, "ad": "Matematik Notları", "fiyat": "50 TL", "satici": "Mehmet"},
+    {"id": 1, "ad": "10. Sınıf Fizik Kitabı", "fiyat": "100 TL", "satici": "Ali", "stok": 1},
+    {"id": 2, "ad": "Kablosuz Kulaklık", "fiyat": "300 TL", "satici": "Ayşe", "stok": 2},
+    {"id": 3, "ad": "Matematik Notları", "fiyat": "50 TL", "satici": "Mehmet", "stok": 3},
 ]
 
 bekleyen_siparisler = []
@@ -33,47 +32,80 @@ son_urun_id = max([u['id'] for u in urunler] if urunler else [0])
 
 @app.route('/')
 def ana_sayfa():
+    # Sadece stok > 0 olan ürünleri göster
+    gosterilecek_urunler = [u for u in urunler if u['stok'] > 0]
+    
     return render_template_string('''
     <h1 style="text-align:center; color:#2c3e50; margin-top:30px;">📚 Sınıf Satış</h1>
     <p style="text-align:center; font-size:18px;">Elden veya IBAN ile • Güvenli alışveriş 😎</p>
     
     <div style="max-width:700px; margin:auto; padding:10px;">
-    {% if urunler %}
-        {% for urun in urunler %}
+    {% if gosterilecek_urunler %}
+        {% for urun in gosterilecek_urunler %}
             <div style="background:#f9f9f9; border:1px solid #ddd; border-radius:12px; padding:20px; margin:20px 0; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
                 <h3>{{ urun.ad }}</h3>
                 <p style="color:#27ae60; font-weight:bold; font-size:20px;">{{ urun.fiyat }}</p>
-                <p style="color:#7f8c8d;">Satıcı: {{ urun.satici }}</p>
+                <p style="color:#7f8c8d;">Satıcı: {{ urun.satici }} • Stok: {{ urun.stok }}</p>
                 
                 <form action="/siparis/{{ urun.id }}" method="post">
-                    <input type="text" name="isim" placeholder="Adın Soyadın (IBAN için zorunlu!)" required 
+                    <input type="text" name="isim" placeholder="Adın Soyadın (zorunlu)" required 
                            style="width:100%; padding:12px; margin:10px 0; border-radius:8px;">
                     
-                    <select name="odeme" required style="width:100%; padding:12px; margin:10px 0; border-radius:8px;">
+                    <select name="odeme" id="odeme_{{ urun.id }}" onchange="eldenKontrol({{ urun.id }})" required 
+                            style="width:100%; padding:12px; margin:10px 0; border-radius:8px;">
                         <option value="elden">Elden vereceğim</option>
                         <option value="iban">IBAN ile ödeyeceğim</option>
                     </select>
+                    
+                    <div id="tel_div_{{ urun.id }}" style="display:block; margin:10px 0;">
+                        <input type="tel" name="telefon" placeholder="Telefon numaran (05xx xxx xx xx)" 
+                               style="width:100%; padding:12px; border-radius:8px;">
+                        <p style="color:red; font-size:14px; margin-top:5px;">
+                            ⚠️ Elden için telefon numarası zorunlu!<br>
+                            Yanlış girersen sipariş geçersiz sayılabilir.
+                        </p>
+                    </div>
                     
                     <button type="submit" style="width:100%; padding:14px; background:#3498db; color:white; border:none; border-radius:8px; font-size:18px;">
                         🚀 Sipariş Ver
                     </button>
                 </form>
+                
+                <script>
+                function eldenKontrol(id) {
+                    var secim = document.getElementById("odeme_" + id).value;
+                    var div = document.getElementById("tel_div_" + id);
+                    if (secim == "elden") {
+                        div.style.display = "block";
+                        div.querySelector("input").required = true;
+                    } else {
+                        div.style.display = "none";
+                        div.querySelector("input").required = false;
+                    }
+                }
+                eldenKontrol({{ urun.id }});  // Sayfa yüklenince kontrol
+                </script>
             </div>
         {% endfor %}
     {% else %}
-        <p style="text-align:center; color:#95a5a6; font-size:20px;">😢 Şu an satılık ürün yok.<br>Yakında yeni ilanlar gelir!</p>
+        <p style="text-align:center; color:#95a5a6; font-size:20px;">😢 Şu an satılık ürün yok.<br>Yeni ilanlar yakında gelir!</p>
     {% endif %}
     </div>
-    ''', urunler=urunler)
+    ''', gosterilecek_urunler=gosterilecek_urunler)
 
 @app.route('/siparis/<int:urun_id>', methods=['POST'])
 def siparis_ver(urun_id):
     urun = next((u for u in urunler if u['id'] == urun_id), None)
-    if not urun:
-        return "<h2>Ürün satıldı veya kaldırıldı!</h2><a href='/'>← Ana Sayfa</a>"
+    if not urun or urun['stok'] <= 0:
+        return "<h2>Ürün stokta yok veya satıldı!</h2><a href='/'>← Ana Sayfa</a>"
 
     isim = request.form['isim'].strip()
     odeme_secimi = request.form['odeme']
+    telefon = request.form.get('telefon', '').strip()
+
+    if odeme_secimi == "elden" and not telefon:
+        return "<h2 style='color:red;'>⚠️ Elden için telefon numarası zorunlu!</h2><a href='/'>← Geri</a>"
+
     odeme_metni = "IBAN ile" if odeme_secimi == "iban" else "Elden"
 
     # Siparişi kaydet
@@ -82,21 +114,25 @@ def siparis_ver(urun_id):
         "urun": urun['ad'],
         "fiyat": urun['fiyat'],
         "alan": isim,
+        "telefon": telefon if odeme_secimi == "elden" else "-",
         "odeme": odeme_metni,
         "satici": urun['satici']
     }
     bekleyen_siparisler.append(yeni_siparis)
 
-    # IBAN seçildiyse bilgi göster
+    # Stok azalt
+    urun['stok'] -= 1
+
+    # Ödeme bilgisi göster
     if odeme_secimi == "iban":
         ekstra_bilgi = f"<div style='background:#fff3cd; padding:15px; border-radius:10px; margin:20px 0; border:1px solid #ffeaa7;'>{IBAN_BILGISI}</div>"
     else:
-        ekstra_bilgi = "<p>Elden ödeme için satıcıyla görüş.</p>"
+        ekstra_bilgi = f"<p>Satıcı seninle iletişime geçecek.<br><b>Telefonun:</b> {telefon}</p>"
 
     return f'''
     <div style="text-align:center; margin:50px; font-size:18px;">
         <h2 style="color:#27ae60;">✅ Sipariş alındı {isim}!</h2>
-        <p><b>{urun['ad']}</b> için siparişin alındı.<br>
+        <p><b>{urun['ad']}</b> için siparişin kaydedildi.<br>
         Ödeme: <b>{odeme_metni}</b></p>
         {ekstra_bilgi}
         <p>Admin onaylayınca işlem tamamlanır. Teşekkürler!</p>
@@ -130,27 +166,27 @@ def admin_panel():
     if not session.get('logged_in'):
         return redirect('/admin_login')
 
-    global son_urun_id
     return render_template_string('''
     <div style="max-width:900px; margin:auto; padding:20px;">
         <h1 style="text-align:center;">🔐 Admin Paneli (Vortex)</h1>
         <p style="text-align:center;"><a href="/admin_cikis">Çıkış yap</a></p>
 
-        <!-- Yeni Ürün Ekle -->
+        <!-- Yeni Ürün Ekle (Stoklu) -->
         <h2 style="color:#3498db;">🆕 Yeni İlan Ekle</h2>
         <form action="/urun_ekle" method="post" style="background:#ecf0f1; padding:20px; border-radius:10px; margin:20px 0;">
             <input type="text" name="ad" placeholder="Ürün adı" required style="width:100%; padding:12px; margin:10px 0; border-radius:8px;">
             <input type="text" name="fiyat" placeholder="Fiyat (örn: 250 TL)" required style="width:100%; padding:12px; margin:10px 0; border-radius:8px;">
             <input type="text" name="satici" placeholder="Satıcı adı" required style="width:100%; padding:12px; margin:10px 0; border-radius:8px;">
+            <input type="number" name="stok" placeholder="Stok miktarı (örn: 1)" value="1" min="1" required style="width:100%; padding:12px; margin:10px 0; border-radius:8px;">
             <button type="submit" style="width:100%; padding:14px; background:#e74c3c; color:white; border:none; border-radius:8px;">+ Ürün Ekle</button>
         </form>
 
-        <!-- Mevcut Ürünler (Silme ile) -->
-        <h2 style="color:#9b59b6;">📦 Mevcut İlanlar ({{ urunler|length }})</h2>
+        <!-- Mevcut Ürünler -->
+        <h2 style="color:#9b59b6;">📦 Mevcut İlanlar</h2>
         {% for urun in urunler %}
             <div style="background:#f8f9fa; padding:15px; margin:15px 0; border-radius:10px; border:1px solid #dee2e6; display:flex; justify-content:space-between; align-items:center;">
                 <div>
-                    <b>{{ urun.ad }}</b> - {{ urun.fiyat }} ({{ urun.satici }})
+                    <b>{{ urun.ad }}</b> - {{ urun.fiyat }} ({{ urun.satici }}) • Stok: {{ urun.stok }}
                 </div>
                 <form action="/urun_sil/{{ urun.id }}" method="post">
                     <button type="submit" style="background:#e74c3c; color:white; padding:8px 16px; border:none; border-radius:5px;">🗑️ Sil</button>
@@ -165,10 +201,11 @@ def admin_panel():
                 <div style="background:#fff; border:1px solid #ccc; padding:15px; margin:15px 0; border-radius:10px;">
                     <b>Ürün:</b> {{ s.urun }} ({{ s.fiyat }})<br>
                     <b>Alan:</b> {{ s.alan }}<br>
+                    {% if s.telefon != "-" %}<b>Telefon:</b> {{ s.telefon }}<br>{% endif %}
                     <b>Ödeme:</b> {{ s.odeme }}<br>
                     <b>Satıcı:</b> {{ s.satici }}<br><br>
                     <form action="/onayla/{{ loop.index0 }}" method="post">
-                        <button type="submit" style="background:#27ae60; color:white; padding:12px 24px; border:none; border-radius:5px; font-size:16px;">✅ Onayla ve Satıştan Kaldır</button>
+                        <button type="submit" style="background:#27ae60; color:white; padding:12px 24px; border:none; border-radius:5px; font-size:16px;">✅ Onayla (Stok Azalt)</button>
                     </form>
                 </div>
             {% endfor %}
@@ -179,7 +216,7 @@ def admin_panel():
         <h2 style="color:#27ae60;">✅ Onaylananlar</h2>
         {% for s in onaylanan %}
             <div style="background:#e8f5e8; padding:12px; margin:10px 0; border-radius:8px;">
-                {{ s.alan }} → {{ s.urun }} ({{ s.odeme }})
+                {{ s.alan }} → {{ s.urun }} ({{ s.odeme }}) {% if s.telefon != "-" %}• Tel: {{ s.telefon }}{% endif %}
             </div>
         {% else %}
             <p>Henüz onaylanan yok.</p>
@@ -198,7 +235,8 @@ def urun_ekle():
         "id": son_urun_id,
         "ad": request.form['ad'].strip(),
         "fiyat": request.form['fiyat'].strip(),
-        "satici": request.form['satici'].strip()
+        "satici": request.form['satici'].strip(),
+        "stok": int(request.form['stok'])
     })
     return redirect('/admin')
 
@@ -215,9 +253,7 @@ def onayla(index):
     if 0 <= index < len(bekleyen_siparisler):
         onaylanan = bekleyen_siparisler.pop(index)
         onaylanan_siparisler.append(onaylanan)
-        # Ürünü listeden kaldır (satıldı)
-        global urunler
-        urunler = [u for u in urunler if u['id'] != onaylanan['urun_id']]
+        # Stok zaten sipariş anında azaltılmıştı, gerekirse tekrar kontrol
     return redirect('/admin')
 
 @app.route('/admin_cikis')
