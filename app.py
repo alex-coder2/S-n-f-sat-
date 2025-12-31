@@ -103,10 +103,10 @@ def ana_sayfa():
                         <option value='iban'>IBAN ile ödeyeceğim</option>
                     </select>
                     
-                    <div id='tel_div_{urun['id']}'>
-                        <input type='tel' name='telefon' placeholder='05xxxxxxxxxx'>
+                    <div id='tel_div_{urun['id']}' style='display:block;'>
+                        <input type='tel' name='telefon' placeholder='05xxxxxxxxxx' required>
                         <p style='color:#ff4444; margin:8px 0;'>
-                            ⚠️ Elden için telefon zorunlu!<br>
+                            ⚠️ Telefon zorunlu!<br>
                             Yanlış girersen sipariş geçersiz olabilir.
                         </p>
                     </div>
@@ -119,13 +119,8 @@ def ana_sayfa():
                     var secim = document.getElementById('odeme_' + id).value;
                     var div = document.getElementById('tel_div_' + id);
                     var input = div.querySelector('input');
-                    if (secim == 'elden') {{
-                        div.style.display = 'block';
-                        input.required = true;
-                    }} else {{
-                        div.style.display = 'none';
-                        input.required = false;
-                    }}
+                    input.required = true;  // Her zaman zorunlu
+                    div.style.display = 'block';  // Her zaman göster
                 }}
                 eldenKontrol({urun['id']});
                 </script>
@@ -145,7 +140,7 @@ def siparis_ver(urun_id):
     odeme_secimi = request.form['odeme']
     telefon = request.form.get('telefon', '').strip()
 
-    if odeme_secimi == "elden" and not telefon:
+    if not telefon:
         return DARK_STYLE + "<div style='text-align:center; padding:100px;'><h2 style='color:#ff4444;'>⚠️ Telefon zorunlu!</h2><a href='/'>← Geri</a></div>"
 
     odeme_metni = "IBAN ile" if odeme_secimi == "iban" else "Elden"
@@ -155,7 +150,7 @@ def siparis_ver(urun_id):
         "urun": urun['ad'],
         "fiyat": urun['fiyat'],
         "alan": isim,
-        "telefon": telefon if odeme_secimi == "elden" else "-",
+        "telefon": telefon,
         "odeme": odeme_metni,
         "satici": urun['satici']
     }
@@ -235,8 +230,7 @@ def admin_panel():
             html += "<div class='kart'>"
             html += f"<p><b>Ürün:</b> {s['urun']} ({s['fiyat']})</p>"
             html += f"<p><b>Alan:</b> {s['alan']}</p>"
-            if s['telefon'] != '-':
-                html += f"<p><b>Telefon:</b> {s['telefon']}</p>"
+            html += f"<p><b>Telefon:</b> {s['telefon']}</p>"
             html += f"<p><b>Ödeme:</b> {s['odeme']}</p>"
             html += f"<p><b>Satıcı:</b> {s['satici']}</p>"
             html += f"<form action='/onayla/{i}' method='post'><button type='submit'>✅ Onayla</button></form>"
@@ -248,8 +242,7 @@ def admin_panel():
     html += "<h2 style='color:#00ff41;'>✅ Onaylananlar</h2>"
     if onaylanan_siparisler:
         for s in onaylanan_siparisler:
-            tel = f" • Tel: {s['telefon']}" if s['telefon'] != '-' else ''
-            html += f"<div style='background:#003300; padding:15px; margin:10px 0; border-radius:12px;'>{s['alan']} → {s['urun']} ({s['odeme']}){tel}</div>"
+            html += f"<div style='background:#003300; padding:15px; margin:10px 0; border-radius:12px;'>{s['alan']} → {s['urun']} ({s['odeme']}) • Tel: {s['telefon']}</div>"
     else:
         html += "<p>Henüz onaylanan yok.</p>"
 
