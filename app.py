@@ -1,9 +1,15 @@
-from flask import Flask, request, redirect, session
+from flask import Flask, request, redirect, session, url_for, jsonify
 import os
 import json
+import uuid
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'vortex_gizli_anahtar_1453_2025')
+
+# Veri dosyaları
+USERS_FILE = "users.json"
+ILANLAR_FILE = "ilanlar.json"
+BEKLEYEN_ODEMELER_FILE = "bekleyen_odemeler.json"
 
 # Admin şifresi
 ADMIN_SIFRE = "Vortex1453"
@@ -12,21 +18,21 @@ ADMIN_SIFRE = "Vortex1453"
 IBAN_BILGISI = """
 <b>IBAN:</b> TR350006400000163002969560<br>
 <b>Alıcı Adı:</b> Haşim Seviniş<br>
-<b>Banka:</b> Ziraat Bankası<br><br>
-<span style="color:#ff4444; font-weight:bold;">
-⚠️ Açıklama kısmına MUTLAKA ADINIZI ve SOYADINIZI yazın!<br>
-Yazmazsanız para geri döner ve sipariş geçersiz sayılır!
+<b>Banka:</b> Garanti BBVA<br><br>
+<span style="color:red; font-weight:bold;">
+⚠️ Açıklama kısmına MUTLAKA KULLANICI ADINIZI yazın!<br>
+Yazmazsanız para geri döner ve ödeme geçersiz sayılır!
 </span>
 """
 
-# Karanlık tema CSS
+# Karanlık tema CSS (mobil uyumlu)
 DARK_STYLE = """
 <style>
-    body { background:#000000; color:#00ff00; font-family: Arial, sans-serif; margin:0; padding:0; min-height:100vh; }
+    body { background:#000; color:#00ff00; font-family: Arial, sans-serif; margin:0; padding:0; min-height:100vh; }
     h1, h2, h3 { color:#00ff41; text-align:center; margin:20px 0; }
     p { line-height:1.6; font-size:16px; }
     a { color:#00ff00; text-decoration:none; }
-    input, select { background:#111111; color:#00ff00; border:2px solid #00ff00; border-radius:12px; padding:14px; font-size:16px; width:100%; box-sizing:border-box; margin:10px 0; }
+    input, select { background:#111; color:#00ff00; border:2px solid #00ff00; border-radius:12px; padding:14px; font-size:16px; width:100%; box-sizing:border-box; margin:10px 0; }
     button { background:#00aa00; color:black; font-weight:bold; font-size:18px; padding:16px; border:none; border-radius:12px; cursor:pointer; width:100%; margin:10px 0; }
     button:hover { background:#00ff00; }
     .kart { background:#0a0a0a; border:2px solid #00ff00; border-radius:20px; padding:25px; margin:20px 0; box-shadow:0 0 20px rgba(0,255,0,0.3); }
@@ -37,152 +43,93 @@ DARK_STYLE = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 """
 
-# Veri dosyası
-DATA_FILE = "data.json"
-
-# Varsayılan veri
-default_data = {
-    "urunler": [
-        {"id": 1, "ad": "10. Sınıf Fizik Kitabı", "fiyat": "100 TL", "satici": "Ali", "stok": 1},
-        {"id": 2, "ad": "Kablosuz Kulaklık", "fiyat": "300 TL", "satici": "Ayşe", "stok": 2},
-        {"id": 3, "ad": "Matematik Notları", "fiyat": "50 TL", "satici": "Mehmet", "stok": 3},
-    ],
-    "bekleyen_siparisler": [],
-    "onaylanan_siparisler": [],
-    "son_urun_id": 3
-}
-
 # Veriyi yükle
-def load_data():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
+def load_json(file):
+    if os.path.exists(file):
+        with open(file, "r", encoding="utf-8") as f:
             return json.load(f)
-    return default_data.copy()
+    return []
 
-# Veriyi kaydet
-def save_data():
-    data_to_save = {
-        "urunler": urunler,
-        "bekleyen_siparisler": bekleyen_siparisler,
-        "onaylanan_siparisler": onaylanan_siparisler,
-        "son_urun_id": son_urun_id
-    }
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data_to_save, f, ensure_ascii=False, indent=4)
+def save_json(file, data):
+    with open(file, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
-# Global değişkenler
-data = load_data()
-urunler = data["urunler"]
-bekleyen_siparisler = data["bekleyen_siparisler"]
-onaylanan_siparisler = data["onaylanan_siparisler"]
-son_urun_id = data["son_urun_id"]
+# Kullanıcılar
+users = load_json(USERS_FILE)
 
-@app.route('/')
-def ana_sayfa():
-    gosterilecek_urunler = [u for u in urunler if u['stok'] > 0]
-    
-    html = DARK_STYLE + "<div style='padding:20px 10px; max-width:600px; margin:auto;'>"
-    html += "<h1>📚 Sınıf Satış</h1>"
-    html += "<p style='text-align:center; font-size:18px;'>Elden veya IBAN • Güvenli Alışveriş 😎</p>"
-    
-    if not gosterilecek_urunler:
-        html += "<p style='text-align:center; font-size:20px; padding:100px 0;'>😢 Şu an satılık ürün yok<br>Yeni ilanlar yakında!</p>"
-    else:
-        for urun in gosterilecek_urunler:
-            html += f"""
-            <div class='kart'>
-                <h3>{urun['ad']}</h3>
-                <p style='font-size:24px; margin:15px 0;'><b>{urun['fiyat']}</b></p>
-                <p>Satıcı: {urun['satici']} • Stok: {urun['stok']}</p>
-                
-                <form action='/siparis/{urun['id']}' method='post'>
-                    <input type='text' name='isim' placeholder='Ad Soyad (zorunlu)' required>
-                    
-                    <select name='odeme' id='odeme_{urun['id']}' onchange="eldenKontrol({urun['id']})" required>
-                        <option value='elden'>Elden vereceğim</option>
-                        <option value='iban'>IBAN ile ödeyeceğim</option>
-                    </select>
-                    
-                    <div id='tel_div_{urun['id']}' style='display:block;'>
-                        <input type='tel' name='telefon' placeholder='05xxxxxxxxxx' required>
-                        <p style='color:#ff4444; margin:8px 0;'>
-                            ⚠️ Telefon zorunlu!<br>
-                            Yanlış girersen sipariş geçersiz olabilir.
-                        </p>
-                    </div>
-                    
-                    <button type='submit'>🚀 Sipariş Ver</button>
-                </form>
-                
-                <script>
-                function eldenKontrol(id) {{
-                    var secim = document.getElementById('odeme_' + id).value;
-                    var div = document.getElementById('tel_div_' + id);
-                    var input = div.querySelector('input');
-                    input.required = true;  // Her zaman zorunlu
-                    div.style.display = 'block';  // Her zaman göster
-                }}
-                eldenKontrol({urun['id']});
-                </script>
-            </div>
-            """
-    
-    html += "<footer>GBAL'ın Resmi Pazarı • 2026 </footer></div>"
-    return html
+# İlanlar (öne çıkarılanlar önce)
+ilanlar = load_json(ILANLAR_FILE)
 
-@app.route('/siparis/<int:urun_id>', methods=['POST'])
-def siparis_ver(urun_id):
-    urun = next((u for u in urunler if u['id'] == urun_id), None)
-    if not urun or urun['stok'] <= 0:
-        return DARK_STYLE + "<div style='text-align:center; padding:100px;'><h2 style='color:#ff4444;'>Ürün stokta yok!</h2><a href='/'>← Ana Sayfa</a></div>"
+# Bekleyen ödemeler
+bekleyen_odemeler = load_json(BEKLEYEN_ODEMELER_FILE)
 
-    isim = request.form['isim'].strip()
-    odeme_secimi = request.form['odeme']
-    telefon = request.form.get('telefon', '').strip()
-
-    if not telefon:
-        return DARK_STYLE + "<div style='text-align:center; padding:100px;'><h2 style='color:#ff4444;'>⚠️ Telefon zorunlu!</h2><a href='/'>← Geri</a></div>"
-
-    odeme_metni = "IBAN ile" if odeme_secimi == "iban" else "Elden"
-
-    yeni_siparis = {
-        "urun_id": urun['id'],
-        "urun": urun['ad'],
-        "fiyat": urun['fiyat'],
-        "alan": isim,
-        "telefon": telefon,
-        "odeme": odeme_metni,
-        "satici": urun['satici']
-    }
-    bekleyen_siparisler.append(yeni_siparis)
-    urun['stok'] -= 1
-    save_data()
-
-    if odeme_secimi == "iban":
-        ekstra = f"<div class='uyari'>{IBAN_BILGISI}</div>"
-    else:
-        ekstra = f"<p style='font-size:18px;'>Satıcı iletişime geçecek<br><b>Telefon:</b> {telefon}</p>"
-
-    return DARK_STYLE + f"""
-    <div style='text-align:center; padding:50px 20px; max-width:600px; margin:auto;'>
-        <h2 style='font-size:28px;'>✅ Sipariş Alındı {isim}!</h2>
-        <p>{urun['ad']} için siparişin alındı.</p>
-        <p><b>Ödeme:</b> {odeme_metni}</p>
-        {ekstra}
-        <p>Admin onaylayınca tamam.</p>
-        <a href='/' style='padding:16px 32px; background:#00aa00; color:black; font-size:18px; border-radius:12px; margin-top:20px; display:inline-block;'>← Ana Sayfa</a>
+# Kullanıcı kaydı
+@app.route('/kayit', methods=['GET', 'POST'])
+def kayit():
+    if request.method == 'POST':
+        username = request.form['username'].strip()
+        password = request.form['password'].strip()
+        telefon = request.form['telefon'].strip()
+        if not username or not password or not telefon:
+            return DARK_STYLE + "<div style='text-align:center; padding:100px;'><h2 style='color:#ff4444;'>⚠️ Tüm alanlar zorunlu!</h2><a href='/kayit'>← Geri</a></div>"
+        if any(u['username'] == username for u in users):
+            return DARK_STYLE + "<div style='text-align:center; padding:100px;'><h2 style='color:#ff4444;'>Kullanıcı adı alınmış!</h2><a href='/kayit'>← Geri</a></div>"
+        users.append({
+            "username": username,
+            "password": password,  # Gerçek hayatta hashle!
+            "telefon": telefon,
+            "ilan_hakki": 0
+        })
+        save_json(USERS_FILE, users)
+        return redirect('/giris')
+    html = DARK_STYLE + "<div style='text-align:center; padding:50px 20px; max-width:400px; margin:auto;'>"
+    html += "<h2>Kayıt Ol</h2>"
+    html += """
+    <form method='post'>
+        <input type='text' name='username' placeholder='Kullanıcı Adı' required>
+        <input type='password' name='password' placeholder='Şifre' required>
+        <input type='tel' name='telefon' placeholder='Telefon Numaran (zorunlu)' required>
+        <button type='submit'>Kayıt Ol</button>
+    </form>
+    <br><a href='/giris'>Giriş Yap</a> | <a href='/'>Ana Sayfa</a>
     </div>
     """
+    return html
 
+# Giriş
+@app.route('/giris', methods=['GET', 'POST'])
+def giris():
+    if request.method == 'POST':
+        username = request.form['username'].strip()
+        password = request.form['password'].strip()
+        user = next((u for u in users if u['username'] == username and u['password'] == password), None)
+        if user:
+            session['user'] = username
+            return redirect('/ilan_ac')
+        return DARK_STYLE + "<div style='text-align:center; padding:100px;'><h2 style='color:#ff4444;'>Yanlış kullanıcı veya şifre!</h2><a href='/giris'>← Geri</a></div>"
+    html = DARK_STYLE + "<div style='text-align:center; padding:50px 20px; max-width:400px; margin:auto;'>"
+    html += "<h2>Giriş Yap</h2>"
+    html += """
+    <form method='post'>
+        <input type='text' name='username' placeholder='Kullanıcı Adı' required>
+        <input type='password' name='password' placeholder='Şifre' required>
+        <button type='submit'>Giriş Yap</button>
+    </form>
+    <br><a href='/kayit'>Kayıt Ol</a> | <a href='/'>Ana Sayfa</a>
+    </div>
+    """
+    return html
+
+# Admin giriş
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
     hata = None
     if request.method == 'POST':
         if request.form['sifre'] == ADMIN_SIFRE:
-            session['logged_in'] = True
+            session['admin_logged_in'] = True
             return redirect('/admin')
         else:
-            hata = "Yanlış şifre knk!"
+            hata = "Yanlış şifre!"
     html = DARK_STYLE + "<div style='text-align:center; padding:100px 20px; max-width:400px; margin:auto;'>"
     html += "<h2>🔐 Admin Girişi</h2>"
     if hata:
@@ -197,96 +144,127 @@ def admin_login():
     """
     return html
 
+# Admin panel
 @app.route('/admin')
-def admin_panel():
-    if not session.get('logged_in'):
+def admin():
+    if not session.get('admin_logged_in'):
         return redirect('/admin_login')
 
     html = DARK_STYLE + "<div style='max-width:900px; margin:auto; padding:20px;'>"
     html += "<h1>🔐 Admin Paneli</h1>"
     html += "<p style='text-align:center;'><a href='/admin_cikis'>Çıkış yap</a></p>"
 
-    # Yeni ürün ekle
-    html += "<h2 style='color:#00ff41;'>🆕 Yeni İlan Ekle</h2>"
-    html += "<div class='kart'><form action='/urun_ekle' method='post'>"
-    html += "<input type='text' name='ad' placeholder='Ürün adı' required>"
-    html += "<input type='text' name='fiyat' placeholder='Fiyat' required>"
-    html += "<input type='text' name='satici' placeholder='Satıcı adı' required>"
-    html += "<input type='number' name='stok' placeholder='Stok' value='1' min='1' required>"
-    html += "<button type='submit'>+ Ürün Ekle</button></form></div>"
-
-    # Mevcut ürünler
-    html += "<h2 style='color:#00ff41;'>📦 Mevcut İlanlar</h2>"
-    for urun in urunler:
-        html += f"<div style='background:#111; padding:15px; margin:10px 0; border-radius:12px; display:flex; justify-content:space-between; align-items:center;'>"
-        html += f"<div><b>{urun['ad']}</b> - {urun['fiyat']} ({urun['satici']}) • Stok: {urun['stok']}</div>"
-        html += f"<form action='/urun_sil/{urun['id']}' method='post'><button type='submit' style='background:#ff0000; padding:10px;'>🗑️ Sil</button></form>"
+    # Bekleyen ödemeler
+    html += "<h2>Bekleyen Ödemeler</h2>"
+    for o in bekleyen_odemeler:
+        html += f"<div class='kart'>"
+        html += f"<p>Kullanıcı: {o['username']}</p>"
+        html += f"<form action='/onayla_odeme/{o['id']}' method='post'><button type='submit'>Onayla (İlan Hakkı Ver)</button></form>"
         html += "</div>"
 
-    # Bekleyen siparişler
-    html += "<h2 style='color:#ff8800;'>⏳ Bekleyen Siparişler</h2>"
-    if bekleyen_siparisler:
-        for i, s in enumerate(bekleyen_siparisler):
-            html += "<div class='kart'>"
-            html += f"<p><b>Ürün:</b> {s['urun']} ({s['fiyat']})</p>"
-            html += f"<p><b>Alan:</b> {s['alan']}</p>"
-            html += f"<p><b>Telefon:</b> {s['telefon']}</p>"
-            html += f"<p><b>Ödeme:</b> {s['odeme']}</p>"
-            html += f"<p><b>Satıcı:</b> {s['satici']}</p>"
-            html += f"<form action='/onayla/{i}' method='post'><button type='submit'>✅ Onayla</button></form>"
-            html += "</div>"
-    else:
-        html += "<p>Bekleyen sipariş yok.</p>"
-
-    # Onaylananlar
-    html += "<h2 style='color:#00ff41;'>✅ Onaylananlar</h2>"
-    if onaylanan_siparisler:
-        for s in onaylanan_siparisler:
-            html += f"<div style='background:#003300; padding:15px; margin:10px 0; border-radius:12px;'>{s['alan']} → {s['urun']} ({s['odeme']}) • Tel: {s['telefon']}</div>"
-    else:
-        html += "<p>Henüz onaylanan yok.</p>"
+    # İlanlar yönetimi
+    html += "<h2>İlanlar</h2>"
+    for i in ilanlar:
+        one_cikar = 'Öne Çıkarılmış' if i['one_cikar'] else ''
+        html += f"<div class='kart'>"
+        html += f"<p>{i['ad']} - {i['fiyat']} ({i['satici']}) {one_cikar}</p>"
+        html += f"<form action='/one_cikar/{i['id']}' method='post'><button type='submit'>Öne Çıkar</button></form>"
+        html += f"<form action='/ilan_sil/{i['id']}' method='post'><button type='submit'>Sil</button></form>"
+        html += "</div>"
 
     html += "<br><a href='/'>← Ana Sayfa</a></div>"
     return html
 
-@app.route('/urun_ekle', methods=['POST'])
-def urun_ekle():
-    if not session.get('logged_in'):
+# Ödeme onaylama
+@app.route('/onayla_odeme/<string:odeme_id>', methods=['POST'])
+def onayla_odeme(odeme_id):
+    if not session.get('admin_logged_in'):
         return redirect('/admin_login')
-    global son_urun_id
-    son_urun_id += 1
-    urunler.append({
-        "id": son_urun_id,
-        "ad": request.form['ad'].strip(),
-        "fiyat": request.form['fiyat'].strip(),
-        "satici": request.form['satici'].strip(),
-        "stok": int(request.form['stok'])
-    })
-    save_data()
+    global bekleyen_odemeler, users
+    odeme = next((o for o in bekleyen_odemeler if o['id'] == odeme_id), None)
+    if odeme:
+        user = next((u for u in users if u['username'] == odeme['username']), None)
+        if user:
+            user['ilan_hakki'] += 1
+            bekleyen_odemeler = [o for o in bekleyen_odemeler if o['id'] != odeme_id]
+            save_json(USERS_FILE, users)
+            save_json(BEKLEYEN_ODEMELER_FILE, bekleyen_odemeler)
     return redirect('/admin')
 
-@app.route('/urun_sil/<int:urun_id>', methods=['POST'])
-def urun_sil(urun_id):
-    if not session.get('logged_in'):
+# İlan öne çıkarma
+@app.route('/one_cikar/<string:ilan_id>', methods=['POST'])
+def one_cikar(ilan_id):
+    if not session.get('admin_logged_in'):
         return redirect('/admin_login')
-    global urunler
-    urunler = [u for u in urunler if u['id'] != urun_id]
-    save_data()
+    global ilanlar
+    for i in ilanlar:
+        if i['id'] == ilan_id:
+            i['one_cikar'] = not i.get('one_cikar', False)
+    save_json(ILANLAR_FILE, ilanlar)
     return redirect('/admin')
 
-@app.route('/onayla/<int:index>', methods=['POST'])
-def onayla(index):
-    if not session.get('logged_in'):
+# İlan sil
+@app.route('/ilan_sil/<string:ilan_id>', methods=['POST'])
+def ilan_sil(ilan_id):
+    if not session.get('admin_logged_in'):
         return redirect('/admin_login')
-    if 0 <= index < len(bekleyen_siparisler):
-        onaylanan = bekleyen_siparisler.pop(index)
-        onaylanan_siparisler.append(onaylanan)
-    save_data()
+    global ilanlar
+    ilanlar = [i for i in ilanlar if i['id'] != ilan_id]
+    save_json(ILANLAR_FILE, ilanlar)
     return redirect('/admin')
 
+# Kullanıcı ilan açma
+@app.route('/ilan_ac', methods=['GET', 'POST'])
+def ilan_ac():
+    if not session.get('user'):
+        return redirect('/giris')
+
+    user = next((u for u in users if u['username'] == session['user']), None)
+    if user['ilan_hakki'] <= 0:
+        odeme_id = str(uuid.uuid4())
+        bekleyen_odemeler.append({"id": odeme_id, "username": user['username']})
+        save_json(BEKLEYEN_ODEMELER_FILE, bekleyen_odemeler)
+        return DARK_STYLE + f"<div style='text-align:center; padding:50px;'><h2>İlan Hakkın Yok</h2><p>Ödeme yap, admin onaylasın.</p><div class='uyari'>{IBAN_BILGISI}</div><a href='/'>← Ana Sayfa</a></div>"
+    
+    if request.method == 'POST':
+        ad = request.form['ad'].strip()
+        fiyat = request.form['fiyat'].strip()
+        ilan_id = str(uuid.uuid4())
+        ilanlar.append({
+            "id": ilan_id,
+            "ad": ad,
+            "fiyat": fiyat,
+            "satici": user['username'],
+            "one_cikar": False
+        })
+        user['ilan_hakki'] -= 1
+        save_json(ILANLAR_FILE, ilanlar)
+        save_json(USERS_FILE, users)
+        return redirect('/')
+
+    html = DARK_STYLE + "<div style='text-align:center; padding:50px 20px; max-width:400px; margin:auto;'>"
+    html += "<h2>İlan Aç</h2>"
+    html += """
+    <form method='post'>
+        <input type='text' name='ad' placeholder='İlan Adı' required>
+        <input type='text' name='fiyat' placeholder='Fiyat' required>
+        <button type='submit'>İlan Aç</button>
+    </form>
+    <br><a href='/'>← Ana Sayfa</a>
+    </div>
+    """
+    return html
+
+# Admin çıkış
 @app.route('/admin_cikis')
 def admin_cikis():
-    session.pop('logged_in', None)
+    session.pop('admin_logged_in', None)
+    return redirect('/')
+
+# Kullanıcı çıkış
+@app.route('/cikis')
+def cikis():
+    session.pop('user', None)
     return redirect('/')
 
 if __name__ == '__main__':
