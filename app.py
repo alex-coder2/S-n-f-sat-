@@ -2,15 +2,13 @@ from flask import Flask, request, redirect, session
 import os
 import json
 import uuid
+from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'vortex_gizli_anahtar_1453_2026')
+app.secret_key = os.getenv('SECRET_KEY', 'vortex_gizli_anahtar_1453_2026_son')
 
 # Admin şifresi
 ADMIN_SIFRE = "Vortex1453"
-
-# İlan açtırma parası (sadece bilgi, kodda kullanılmıyor)
-ILAN_PARASI = "25 TL"
 
 # IBAN bilgisi
 IBAN_UYARI = """
@@ -18,29 +16,30 @@ IBAN_UYARI = """
 <b>Alıcı:</b> Haşim Seviniş<br>
 <b>Banka:</b> Garanti BBVA<br><br>
 <span style="color:#ff4444; font-weight:bold;">
-⚠️ Açıklama kısmına KULLANICI ADINI yaz!<br>
+⚠️ Açıklama kısmına MUTLAKA KULLANICI ADINI yaz!<br>
 Yazmazsan ödeme onaylanmaz!
 </span>
-<p>İlan açtırma parası: """ + ILAN_PARASI + """</p>
 """
 
-# Karanlık tema CSS - butonlar düzeltilmiş, üst üste gelmez
+# Karanlık tema CSS - sağ üst butonlar düzgün
 STYLE = """
 <style>
-    body { background:#000; color:#00ff00; font-family:Arial; margin:0; padding:0; min-height:100vh; }
+    body { background:#000; color:#00ff00; font-family:Arial, sans-serif; margin:0; padding:0; min-height:100vh; box-sizing:border-box; }
     h1 { color:#00ff41; text-align:center; margin:30px 0; font-size:28px; }
-    .header { position:fixed; top:0; left:0; right:0; background:#000; padding:10px; text-align:right; border-bottom:2px solid #00ff00; z-index:100; }
-    .header a { background:#00aa00; color:#000; padding:8px 16px; border-radius:20px; font-size:14px; margin-left:10px; font-weight:bold; display:inline-block; width:auto; }
-    .header span { color:#00ff00; margin-right:10px; font-weight:bold; }
-    .content { padding-top:70px; max-width:600px; margin:auto; padding-left:10px; padding-right:10px; }
-    .card { background:#0a0a0a; border:2px solid #00ff00; border-radius:20px; padding:25px; margin:20px 0; box-shadow:0 0 15px rgba(0,255,0,0.3); }
-    input { background:#111; color:#00ff00; border:2px solid #00ff00; border-radius:12px; padding:14px; width:100%; margin:10px 0; box-sizing:border-box; font-size:16px; }
+    h2 { color:#00ff41; text-align:center; margin:20px 0; }
+    p { line-height:1.6; font-size:16px; margin:10px 0; }
+    a { color:#00ff00; text-decoration:none; }
+    input, select { background:#111; color:#00ff00; border:2px solid #00ff00; border-radius:12px; padding:14px; width:100%; margin:10px 0; box-sizing:border-box; font-size:16px; }
     button { background:#00aa00; color:#000; padding:14px; border:none; border-radius:12px; width:100%; font-weight:bold; font-size:18px; margin:10px 0; cursor:pointer; }
     button:hover { background:#00ff00; }
+    .card { background:#0a0a0a; border:2px solid #00ff00; border-radius:20px; padding:25px; margin:20px 0; box-shadow:0 0 20px rgba(0,255,0,0.3); }
     .warn { background:#330000; border:2px solid #ff4444; border-radius:15px; padding:20px; margin:20px 0; }
-    .buy-button { background:#ff8800; color:#000; }
+    .buy { background:#ff8800; color:#000; }
+    .header { position:fixed; top:0; left:0; right:0; background:#000; padding:10px; text-align:right; border-bottom:2px solid #00ff00; z-index:1000; }
+    .header a, .header span { background:#00aa00; color:#000; padding:8px 16px; border-radius:20px; font-size:14px; margin-left:10px; font-weight:bold; display:inline-block; }
+    .content { padding-top:70px; max-width:600px; margin:auto; padding-left:10px; padding-right:10px; }
     footer { text-align:center; padding:30px; color:#006600; font-size:14px; }
-    @media (max-width:600px) { .header a { padding:6px 12px; font-size:13px; margin-left:5px; } }
+    @media (max-width:600px) { .header a, .header span { padding:6px 12px; font-size:13px; margin-left:5px; } }
 </style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 """
@@ -74,13 +73,17 @@ def ana_sayfa():
         current_user = next((u for u in users if u['username'] == session['user']), None)
         hak = current_user['ilan_hakki'] if current_user else 0
         html += f"<span>{session['user']} (Hak: {hak})</span>"
-        html += "<a href='/ilanlarim'>İlanlarım</a> <a href='/ilan_ac'>İlan Aç</a> <a href='/cikis'>Çıkış</a>"
+        html += "<a href='/ilan_ac'>İlan Aç</a>"
+        html += "<a href='/ilanlarim'>İlanlarım</a>"
+        html += "<a href='/cikis'>Çıkış</a>"
     else:
-        html += "<a href='/kayit'>Kayıt Ol</a> <a href='/giris'>Giriş Yap</a>"
+        html += "<a href='/kayit'>Kayıt Ol</a>"
+        html += "<a href='/giris'>Giriş Yap</a>"
     html += "</div>"
     
     html += "<div class='content'>"
     html += "<h1>📚 Sınıf Pazarı</h1>"
+    html += "<p style='text-align:center; font-size:18px; margin-bottom:40px;'>Güvenli ikinci el alışveriş</p>"
     
     if not sirali:
         html += "<p style='text-align:center; padding:100px 0; font-size:18px;'>😢 Şu an satılık ilan yok.<br>Yeni ilanlar yakında gelir!</p>"
@@ -94,7 +97,7 @@ def ana_sayfa():
             html += f"<p><b>Stok:</b> {i['stok']}</p>"
             if 'user' in session and session['user'] != i['satici']:
                 html += f"<form action='/satin_al/{i['id']}' method='post'>"
-                html += "<button class='buy-button' type='submit'>Satın Al</button>"
+                html += "<button class='buy' type='submit'>Satın Al</button>"
                 html += "</form>"
             html += "</div>"
     
@@ -162,17 +165,18 @@ def ilan_ac():
         return STYLE + "<div class='header'><a href='/'>Ana Sayfa</a></div>"
         + "<div class='content'><h2>İlan Hakkın Yok</h2>"
         + f"<div class='warn'>{IBAN_UYARI}</div>"
-        + "<p>Ödeme yapınca admin onaylayacak.</p></div>"
+        + "<p>Ödeme yapınca admin onaylayacak.</p><a href='/'>Ana Sayfa</a></div>"
     
     if request.method == 'POST':
         ilan_id = str(uuid.uuid4())
+        stok = int(request.form['stok'])
         ilanlar.append({
             "id": ilan_id,
             "ad": request.form['ad'].strip(),
             "fiyat": request.form['fiyat'].strip(),
             "satici": user['username'],
             "one_cikar": False,
-            "stok": int(request.form['stok']),
+            "stok": stok,
             "satin_alanlar": []
         })
         user['ilan_hakki'] -= 1
@@ -183,12 +187,12 @@ def ilan_ac():
     return STYLE + "<div class='header'><a href='/'>Ana Sayfa</a></div>"
     + "<div class='content'><h2>Yeni İlan Aç</h2>"
     + "<form method='post'>"
-    + "<input name='ad' placeholder='İlan Başlığı' required>"
-    + "<input name='fiyat' placeholder='Fiyat (örn: 250 TL)' required>"
-    + "<input type='number' name='stok' placeholder='Stok Miktarı' min='1' value='1' required>"
+    + "<input name='ad' placeholder='Başlık' required>"
+    + "<input name='fiyat' placeholder='Fiyat' required>"
+    + "<input type='number' name='stok' placeholder='Stok' value='1' min='1' required>"
     + "<button>İlan Aç</button></form></div>"
 
-@app.route('/ilanlarim', methods=['GET', 'POST'])
+@app.route('/ilanlarim')
 def ilanlarim():
     if 'user' not in session:
         return redirect('/giris')
@@ -198,24 +202,23 @@ def ilanlarim():
     html += "<div class='content'><h2>İlanlarım</h2>"
     
     if not user_ilanlar:
-        html += "<p style='text-align:center; padding:100px 0; font-size:18px;'>Henüz ilanın yok. <a href='/ilan_ac'>Yeni İlan Aç</a></p>"
+        html += "<p style='text-align:center; padding:100px 0;'>Henüz ilanın yok.</p>"
     else:
         for i in user_ilanlar:
-            one = " ⭐ Öne Çıkarılmış" if i.get('one_cikar') else ""
             html += f"<div class='card'>"
-            html += f"<h3>{i['ad']}{one}</h3>"
+            html += f"<h3>{i['ad']}</h3>"
             html += f"<p><b>Fiyat:</b> {i['fiyat']}</p>"
             html += f"<p><b>Stok:</b> {i['stok']}</p>"
             html += "<p><b>Satın Alanlar:</b></p>"
             if i['satin_alanlar']:
                 for alici in i['satin_alanlar']:
-                    alici_info = next((u for u in users if u['username'] == alici['alan']), None)
-                    tel = alici_info['telefon'] if alici_info else "Bilinmiyor"
-                    html += f"<p>{alici['alan']} - Telefon: {tel} - İletişime geçin!</p>"
+                    alici_user = next((u for u in users if u['username'] == alici['alan']), None)
+                    tel = alici_user['telefon'] if alici_user else "Bilinmiyor"
+                    html += f"<p>{alici['alan']} - Tel: {tel} (İletişime geç!)</p>"
             else:
-                html += "<p>Henüz satın alan yok.</p>"
+                html += "<p>Henüz satan yok.</p>"
             html += f"<form action='/ilan_sil/{i['id']}' method='post'>"
-            html += "<button style='background:#ff0000;'>İlanı Sil (1 hak geri ver)</button>"
+            html += "<button style='background:#ff0000;'>İlanı Sil (1 hak geri)</button>"
             html += "</form>"
             html += "</div>"
     
@@ -229,29 +232,27 @@ def satin_al(id):
     ilan = next((i for i in ilanlar if i['id'] == id), None)
     if not ilan or ilan['stok'] <= 0:
         return STYLE + "<div class='header'><a href='/'>Ana Sayfa</a></div>"
-        + "<div class='content'><h2 style='color:#ff4444;'>Stok yok veya ilan bulunamadı!</h2><a href='/'>Ana Sayfa</a></div>"
+        + "<div class='content'><h2 style='color:#ff4444;'>Stok yok!</h2><a href='/'>Ana Sayfa</a></div>"
     
     alici = session['user']
     ilan['satin_alanlar'].append({"alan": alici})
     ilan['stok'] -= 1
+    
     if ilan['stok'] <= 0:
         ilanlar.remove(ilan)
-        satıcı_user = next((u for u in users if u['username'] == ilan['satici']), None)
-        if satıcı_user:
-            satıcı_user['ilan_hakki'] += 1
+        satıcı = next((u for u in users if u['username'] == ilan['satici']), None)
+        if satıcı:
+            satıcı['ilan_hakki'] += 1
             save(USERS_FILE, users)
+    
     save(ILANLAR_FILE, ilanlar)
     
-    alici_info = next((u for u in users if u['username'] == alici), None)
-    satıcı_info = next((u for u in users if u['username'] == ilan['satici']), None)
-    alici_tel = alici_info['telefon'] if alici_info else "Bilinmiyor"
-    satici_tel = satıcı_info['telefon'] if satıcı_info else "Bilinmiyor"
-    
+    satıcı_tel = next((u for u in users if u['username'] == ilan['satici']), None)['telefon']
     html = STYLE + "<div class='header'><a href='/'>Ana Sayfa</a></div>"
-    html += "<div class='content'><h2 style='color:#00ff41;'>Satın Alma Başarılı!</h2>"
+    html += "<div class='content'><h2 style='color:#00ff41;'>Satın Alındı!</h2>"
     html += f"<p>{ilan['ad']} satın alındı.</p>"
-    html += f"<p><b>Satıcı Telefon:</b> {satici_tel} - İletişime geçin!</p>"
-    html += "</div>"
+    html += f"<p><b>Satıcı Telefon:</b> {satıcı_tel} (İletişime geç)</p>"
+    html += "<a href='/'>Ana Sayfa</a></div>"
     return html
 
 @app.route('/ilan_sil/<id>', methods=['POST'])
@@ -272,81 +273,56 @@ def cikis():
     session.pop('user', None)
     return redirect('/')
 
-# Admin paneli
+# Admin bölümü
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
         if request.form['sifre'] == ADMIN_SIFRE:
             session['admin'] = True
             return redirect('/admin')
-    html = STYLE + "<div class='header'><a href='/'>Ana Sayfa</a></div>"
-    html += "<div class='content'><h2>🔐 Admin Girişi</h2>"
-    html += "<form method='post'>"
-    html += "<input type='password' name='sifre' placeholder='Admin Şifresi' required>"
-    html += "<button>Giriş Yap</button>"
-    html += "</form>"
-    html += "</div>"
-    return html
+    return STYLE + "<div class='header'><a href='/'>Ana Sayfa</a></div>"
+    + "<div class='content'><h2>🔐 Admin Giriş</h2>"
+    + "<form method='post'>"
+    + "<input type='password' name='sifre' placeholder='Şifre' required>"
+    + "<button>Giriş Yap</button></form></div>"
 
 @app.route('/admin')
 def admin():
     if not session.get('admin'):
         return redirect('/admin_login')
     
-    html = STYLE + "<div class='header'><a href='/admin_cikis'>Çıkış Yap</a></div>"
+    html = STYLE + "<div class='header'><a href='/admin_cikis'>Çıkış</a></div>"
     html += "<div class='content'><h1>🔐 Admin Paneli</h1>"
     
     # Bekleyen ödemeler
     html += "<h2>⏳ Bekleyen Ödemeler</h2>"
     if bekleyen_odemeler:
         for o in bekleyen_odemeler:
-            html += f"<div class='card'>"
-            html += f"<p><b>Kullanıcı:</b> {o['username']}</p>"
-            html += f"<form action='/odeme_onayla/{o['id']}' method='post'>"
-            html += "<button>Onayla (1 İlan Hakkı Ver)</button>"
-            html += "</form>"
-            html += "</div>"
+            html += f"<div class='card'><p>Kullanıcı: {o['username']}</p>"
+            html += f"<form action='/odeme_onayla/{o['id']}' method='post'><button>Onayla</button></form></div>"
     else:
-        html += "<p>Bekleyen ödeme yok.</p>"
+        html += "<p>Yok</p>"
     
-    # Tüm ilanlar
-    html += "<h2>📦 Tüm İlanlar</h2>"
-    if ilanlar:
-        for i in ilanlar:
-            star = " ⭐" if i.get('one_cikar') else ""
-            html += f"<div class='card'>"
-            html += f"<p><b>{i['ad']}</b> - {i['fiyat']} ({i['satici']}){star}</p>"
-            html += f"<p>Stok: {i['stok']}</p>"
-            html += f"<form action='/one_cikar/{i['id']}' method='post'>"
-            html += "<button>Öne Çıkar</button>"
-            html += "</form>"
-            html += f"<form action='/ilan_sil_admin/{i['id']}' method='post'>"
-            html += "<button style='background:#ff0000;'>Sil</button>"
-            html += "</form>"
-            html += "</div>"
-    else:
-        html += "<p>Henüz ilan yok.</p>"
-    
-    # Kullanıcılar (banlama)
+    # Kullanıcılar (ban)
     html += "<h2>👥 Kullanıcılar</h2>"
-    if users:
-        for u in users:
-            banned = " (Banlı)" if u.get('banned') else ""
-            html += f"<div class='card'>"
-            html += f"<p><b>{u['username']}</b>{banned}</p>"
-            html += f"<p>Telefon: {u['telefon']}</p>"
-            html += f"<p>İlan Hakkı: {u['ilan_hakki']}</p>"
-            html += f"<form action='/banla/{u['username']}' method='post'>"
-            html += "<button style='background:#ff0000;'>Banla</button>"
-            html += "</form>"
-            html += f"<form action='/ban_kaldir/{u['username']}' method='post'>"
-            html += "<button>Ban Kaldır</button>"
-            html += "</form>"
-            html += "</div>"
-    else:
-        html += "<p>Kullanıcı yok.</p>"
+    for u in users:
+        banned = " (Banlı)" if u.get('banned') else ""
+        html += f"<div class='card'><p>{u['username']}{banned} - Hak: {u['ilan_hakki']} - Tel: {u['telefon']}</p>"
+        if u.get('banned'):
+            html += f"<form action='/ban_kaldir/{u['username']}' method='post'><button>Ban Kaldır</button></form>"
+        else:
+            html += f"<form action='/banla/{u['username']}' method='post'><button style='background:#ff0000;'>Banla</button></form>"
+        html += "</div>"
     
-    html += "<br><a href='/'>← Ana Sayfa</a></div>"
+    # İlanlar
+    html += "<h2>📦 İlanlar</h2>"
+    for i in ilanlar:
+        star = " ⭐" if i.get('one_cikar') else ""
+        html += f"<div class='card'><p>{i['ad']} - {i['fiyat']} ({i['satici']}){star} - Stok: {i['stok']}</p>"
+        html += f"<form action='/one_cikar/{i['id']}' method='post'><button>Öne Çıkar</button></form>"
+        html += f"<form action='/ilan_sil/{i['id']}' method='post'><button style='background:#ff0000;'>Sil</button></form></div>"
+    
+    html += "<a href='/'>Ana Sayfa</a></div>"
     return html
 
 @app.route('/odeme_onayla/<id>', methods=['POST'])
@@ -373,13 +349,14 @@ def one_cikar(id):
     save(ILANLAR_FILE, ilanlar)
     return redirect('/admin')
 
-@app.route('/ilan_sil_admin/<id>', methods=['POST'])
-def ilan_sil_admin(id):
+@app.route('/ilan_sil/<id>', methods=['POST'])
+def ilan_sil(id):
     if not session.get('admin'):
         return redirect('/admin_login')
-    global ilanlar
-    ilanlar = [i for i in ilanlar if i['id'] != id]
-    save(ILANLAR_FILE, ilanlar)
+    ilan = next((i for i in ilanlar if i['id'] == id), None)
+    if ilan:
+        ilanlar.remove(ilan)
+        save(ILANLAR_FILE, ilanlar)
     return redirect('/admin')
 
 @app.route('/banla/<username>', methods=['POST'])
