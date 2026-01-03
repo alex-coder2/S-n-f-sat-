@@ -379,7 +379,7 @@ def ilanlarim():
     else:
         html += "<p>Aktif ilanınız bulunmamaktadır.</p>"
     
-    html += "<h3>Tamamlanan Siparişler</h3>"
+    html += "<h3>Alınan Siparişler</h3>"
     if tamamlanan:
         for s in tamamlanan:
             alici_user = next((u for u in users if u['username'] == s['alici']), None)
