@@ -21,6 +21,7 @@ IBAN_UYARI = """
         Yazmazsan ödeme onaylanmaz ve ilan açamazsın!
     </p>
     <p>İlan açtırma parası: 25 TL</p>
+    <p>Öne çıkartacaksanız: 75 TL</p>
     <p>Ödeme yaptıktan sonra admin onaylayacak ve 1 ilan hakkı alacaksın.</p>
 </div>
 """
