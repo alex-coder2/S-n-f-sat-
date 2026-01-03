@@ -15,7 +15,7 @@ IBAN_UYARI = """
 <div class="warn">
     <p><b>IBAN:</b> TR350006400000163002969560</p>
     <p><b>Alıcı Adı:</b> Haşim Seviniş</p>
-    <p><b>Banka:</b> Garanti BBVA</p>
+    <p><b>Banka:</b> Ziraat Bankası</p>
     <p style="color:#ff4444; font-weight:bold;">
         ⚠️ Açıklama kısmına MUTLAKA KULLANICI ADINI yaz!<br>
         Yazmazsan ödeme onaylanmaz ve ilan açamazsın!
