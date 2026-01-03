@@ -1,6 +1,5 @@
-# templates.py - Tüm HTML şablonları (app.py ile aynı klasöre koy)
+# templates.py - Tam, uzun, eksiksiz ve çalışır şablonlar (app.py ile aynı klasöre koy)
 
-# IBAN uyarısı
 IBAN_UYARI = """
 <div class="warn">
     <p><b>IBAN:</b> TR350006400000163002969560</p>
@@ -11,10 +10,10 @@ IBAN_UYARI = """
         Yazmazsan ödeme onaylanmaz ve ilan açamazsın!
     </p>
     <p>İlan açtırma parası: 25 TL</p>
+    <p>Ödeme yaptıktan sonra admin onaylayacak ve 1 ilan hakkı alacaksın.</p>
 </div>
 """
 
-# Karanlık tema CSS - uzun ve detaylı
 STYLE = """
 <style>
     body { 
@@ -77,7 +76,7 @@ STYLE = """
         font-size:18px; 
         margin:10px 0; 
         cursor:pointer; 
-        transition: background 0.3s;
+        transition: background 0.3s, box-shadow 0.3s;
     }
     button:hover { 
         background:#00ff00; 
@@ -90,10 +89,11 @@ STYLE = """
         padding:25px; 
         margin:20px 0; 
         box-shadow:0 0 20px rgba(0,255,0,0.3); 
-        transition: transform 0.2s;
+        transition: transform 0.2s, box-shadow 0.2s;
     }
     .card:hover { 
         transform: translateY(-5px); 
+        box-shadow: 0 0 30px rgba(0,255,0,0.5);
     }
     .warn { 
         background:#330000; 
@@ -152,7 +152,6 @@ STYLE = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 """
 
-# Ana sayfa şablonu
 ANA_SAYFA = STYLE + """
 <div class='header'>
     {% if session.user %}
@@ -194,7 +193,6 @@ ANA_SAYFA = STYLE + """
 </div>
 """
 
-# Kayıt ol şablonu
 KAYIT = STYLE + """
 <div class='header'><a href='/'>Ana Sayfa</a></div>
 <div class='content'>
@@ -210,7 +208,6 @@ KAYIT = STYLE + """
 </div>
 """
 
-# Giriş yap şablonu
 GIRIS = STYLE + """
 <div class='header'><a href='/'>Ana Sayfa</a></div>
 <div class='content'>
@@ -225,7 +222,6 @@ GIRIS = STYLE + """
 </div>
 """
 
-# İlan aç şablonu
 ILAN_AC = STYLE + """
 <div class='header'><a href='/'>Ana Sayfa</a></div>
 <div class='content'>
@@ -240,7 +236,6 @@ ILAN_AC = STYLE + """
 </div>
 """
 
-# İlanlarım şablonu
 ILANLARIM = STYLE + """
 <div class='header'><a href='/'>Ana Sayfa</a></div>
 <div class='content'>
@@ -281,7 +276,6 @@ ILANLARIM = STYLE + """
 </div>
 """
 
-# Satın al başarılı şablonu
 SATIN_AL_BASARILI = STYLE + """
 <div class='header'><a href='/'>Ana Sayfa</a></div>
 <div class='content'>
@@ -293,7 +287,6 @@ SATIN_AL_BASARILI = STYLE + """
 </div>
 """
 
-# Ödeme gerekli şablonu
 ODEME_GEREKLI = STYLE + """
 <div class='header'><a href='/'>Ana Sayfa</a></div>
 <div class='content'>
@@ -305,7 +298,6 @@ ODEME_GEREKLI = STYLE + """
 </div>
 """
 
-# Hata şablonu
 HATA = STYLE + """
 <div class='header'><a href='/'>Ana Sayfa</a></div>
 <div class='content'>
@@ -315,7 +307,6 @@ HATA = STYLE + """
 </div>
 """
 
-# Admin giriş şablonu
 ADMIN_LOGIN = STYLE + """
 <div class='header'><a href='/'>Ana Sayfa</a></div>
 <div class='content'>
@@ -328,7 +319,6 @@ ADMIN_LOGIN = STYLE + """
 </div>
 """
 
-# Admin panel şablonu
 ADMIN = STYLE + """
 <div class='header'><a href='/admin_cikis'>Çıkış Yap</a></div>
 <div class='content'>
