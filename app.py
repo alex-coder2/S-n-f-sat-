@@ -20,10 +20,10 @@ Yazmazsan ödeme onaylanmaz!
 </span>
 """
 
-# Karanlık tema + mobil uyumlu + küçük butonlar sağ üstte
+# Karanlık tema + sağ üst küçük butonlar + mobil uyumlu
 STYLE = """
 <style>
-    body { background:#000; color:#00ff00; font-family:Arial; margin:0; padding:20px 10px 0; min-height:100vh; box-sizing:border-box; }
+    body { background:#000; color:#00ff00; font-family:Arial, sans-serif; margin:0; padding:60px 10px 20px; min-height:100vh; box-sizing:border-box; }
     h1 { color:#00ff41; text-align:center; margin:20px 0 40px; font-size:28px; }
     a { color:#00ff00; text-decoration:none; }
     input, select { background:#111; color:#00ff00; border:2px solid #00ff00; border-radius:12px; padding:14px; width:100%; margin:10px 0; box-sizing:border-box; font-size:16px; }
@@ -31,15 +31,15 @@ STYLE = """
     button:hover { background:#00ff00; }
     .card { background:#0a0a0a; border:2px solid #00ff00; border-radius:20px; padding:25px; margin:20px 0; box-shadow:0 0 15px rgba(0,255,0,0.3); }
     .warn { background:#330000; border:2px solid #ff4444; border-radius:15px; padding:20px; margin:20px 0; }
-    .header-links { position:fixed; top:10px; right:10px; z-index:100; }
-    .header-links a { background:#00aa00; color:#000; padding:10px 16px; border-radius:20px; font-size:14px; margin-left:10px; font-weight:bold; }
+    .header { position:fixed; top:0; left:0; right:0; background:#000; padding:10px; text-align:right; border-bottom:2px solid #00ff00; z-index:100; }
+    .header a { background:#00aa00; color:#000; padding:8px 16px; border-radius:20px; font-size:14px; margin-left:10px; font-weight:bold; }
     footer { text-align:center; padding:30px; color:#006600; font-size:14px; }
-    @media (max-width:600px) { h1 { font-size:24px; } .header-links a { padding:8px 12px; font-size:13px; } }
+    @media (max-width:600px) { h1 { font-size:24px; } .header a { padding:6px 12px; font-size:13px; } }
 </style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 """
 
-# Dosyalar
+# Veri dosyaları
 USERS_FILE = "users.json"
 ILANLAR_FILE = "ilanlar.json"
 ODEMELER_FILE = "odemeler.json"
@@ -63,15 +63,17 @@ def ana_sayfa():
     sirali = sorted(ilanlar, key=lambda x: x.get('one_cikar', False), reverse=True)
     
     html = STYLE
-    # Sağ üst butonlar
-    html += "<div class='header-links'>"
+    # Sağ üst header butonları
+    html += "<div class='header'>"
     if 'user' in session:
-        html += f"{session['user']} | <a href='/ilan_ac'>İlan Aç</a> | <a href='/cikis'>Çıkış</a>"
+        current_user = next((u for u in users if u['username'] == session['user']), None)
+        ilan_hakki = current_user['ilan_hakki'] if current_user else 0
+        html += f"<b>{session['user']}</b> (Hak: {ilan_hakki}) | <a href='/ilan_ac'>İlan Aç</a> | <a href='/cikis'>Çıkış</a>"
     else:
         html += "<a href='/kayit'>Kayıt Ol</a> <a href='/giris'>Giriş Yap</a>"
     html += "</div>"
     
-    html += "<div style='max-width:600px; margin:auto; padding-top:60px;'>"
+    html += "<div style='max-width:600px; margin:auto auto;'>"
     html += "<h1>📚 Sınıf Pazarı</h1>"
     
     if not sirali:
@@ -99,13 +101,14 @@ def kayit():
         users.append({"username": username, "password": password, "telefon": telefon, "ilan_hakki": 0})
         save(USERS_FILE, users)
         return redirect('/giris')
-    return STYLE + "<div style='max-width:400px; margin:auto; padding-top:60px;'><h2>Kayıt Ol</h2>"
+    return STYLE + "<div class='header'><a href='/'>Ana Sayfa</a></div>"
+    + "<div style='max-width:400px; margin:auto; padding-top:60px;'><h2>Kayıt Ol</h2>"
     + "<form method='post'>"
     + "<input name='username' placeholder='Kullanıcı Adı' required>"
     + "<input type='password' name='password' placeholder='Şifre' required>"
-    + "<input name='telefon' placeholder='Telefon' required>"
+    + "<input name='telefon' placeholder='Telefon (05xxxxxxxxxx)' required>"
     + "<button>Kayıt Ol</button></form>"
-    + "<br><a href='/giris'>Giriş Yap</a> | <a href='/'>Ana Sayfa</a></div>"
+    + "<br><a href='/giris'>Giriş Yap</a></div>"
 
 @app.route('/giris', methods=['GET', 'POST'])
 def giris():
@@ -117,12 +120,13 @@ def giris():
             session['user'] = username
             return redirect('/')
         return STYLE + "<div style='text-align:center; padding:100px;'><h2>Yanlış bilgi!</h2><a href='/giris'>Geri</a></div>"
-    return STYLE + "<div style='max-width:400px; margin:auto; padding-top:60px;'><h2>Giriş Yap</h2>"
+    return STYLE + "<div class='header'><a href='/'>Ana Sayfa</a></div>"
+    + "<div style='max-width:400px; margin:auto; padding-top:60px;'><h2>Giriş Yap</h2>"
     + "<form method='post'>"
     + "<input name='username' placeholder='Kullanıcı Adı' required>"
     + "<input type='password' name='password' placeholder='Şifre' required>"
     + "<button>Giriş Yap</button></form>"
-    + "<br><a href='/kayit'>Kayıt Ol</a> | <a href='/'>Ana Sayfa</a></div>"
+    + "<br><a href='/kayit'>Kayıt Ol</a></div>"
 
 @app.route('/ilan_ac', methods=['GET', 'POST'])
 def ilan_ac():
@@ -133,7 +137,8 @@ def ilan_ac():
         odeme_id = str(uuid.uuid4())
         bekleyen_odemeler.append({"id": odeme_id, "username": user['username']})
         save(ODEMELER_FILE, bekleyen_odemeler)
-        return STYLE + f"<div style='max-width:500px; margin:auto; padding-top:60px;'><h2>İlan Hakkın Yok</h2><div class='warn'>{IBAN_UYARI}</div><a href='/'>Ana Sayfa</a></div>"
+        return STYLE + f"<div class='header'><a href='/'>Ana Sayfa</a></div>"
+        + f"<div style='max-width:500px; margin:auto; padding-top:60px;'><h2>İlan Hakkın Yok</h2><div class='warn'>{IBAN_UYARI}</div><a href='/'>Ana Sayfa</a></div>"
     
     if request.method == 'POST':
         ilan_id = str(uuid.uuid4())
@@ -149,24 +154,26 @@ def ilan_ac():
         save(USERS_FILE, users)
         return redirect('/')
     
-    return STYLE + "<div style='max-width:400px; margin:auto; padding-top:60px;'><h2>İlan Aç</h2><form method='post'>"
+    return STYLE + "<div class='header'><a href='/'>Ana Sayfa</a></div>"
+    + "<div style='max-width:400px; margin:auto; padding-top:60px;'><h2>İlan Aç</h2><form method='post'>"
     + "<input name='ad' placeholder='Başlık' required>"
     + "<input name='fiyat' placeholder='Fiyat' required>"
-    + "<button>İlan Aç</button></form><a href='/'>Ana Sayfa</a></div>"
+    + "<button>İlan Aç</button></form></div>"
 
 @app.route('/cikis')
 def cikis():
     session.pop('user', None)
     return redirect('/')
 
-# Admin
+# Admin paneli
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
         if request.form['sifre'] == ADMIN_SIFRE:
             session['admin'] = True
             return redirect('/admin')
-    return STYLE + "<div style='max-width:400px; margin:auto; padding-top:60px;'><h2>Admin Giriş</h2>"
+    return STYLE + "<div class='header'><a href='/'>Ana Sayfa</a></div>"
+    + "<div style='max-width:400px; margin:auto; padding-top:60px;'><h2>Admin Giriş</h2>"
     + "<form method='post'>"
     + "<input type='password' name='sifre' placeholder='Şifre' required>"
     + "<button>Giriş Yap</button></form></div>"
@@ -176,8 +183,8 @@ def admin():
     if not session.get('admin'):
         return redirect('/admin_login')
     
-    html = STYLE + "<div style='max-width:900px; margin:auto; padding-top:60px;'><h1>Admin Paneli</h1>"
-    html += "<p><a href='/admin_cikis'>Çıkış</a></p>"
+    html = STYLE + "<div class='header'><a href='/admin_cikis'>Çıkış</a></div>"
+    html += "<div style='max-width:900px; margin:auto; padding-top:60px;'><h1>Admin Paneli</h1>"
     
     html += "<h2>Bekleyen Ödemeler</h2>"
     if bekleyen_odemeler:
