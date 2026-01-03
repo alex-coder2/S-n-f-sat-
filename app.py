@@ -4,6 +4,8 @@ import json
 import uuid
 from datetime import datetime
 
+from templates import *
+
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'vortex_gizli_anahtar_1453_2026_uzun_versiyon')
 
