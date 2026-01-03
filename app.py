@@ -4,8 +4,6 @@ import json
 import uuid
 from datetime import datetime
 
-from templates import *
-
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'vortex_gizli_anahtar_1453_2026_tam_eksiksiz_uzun_versiyon')
 
@@ -467,16 +465,27 @@ def cikis():
     session.pop('user', None)
     return redirect('/')
 
-# Admin giriş
+# Admin giriş (şifre soran sayfa düzeltildi)
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
-        if request.form['sifre'] == ADMIN_SIFRE:
+        sifre = request.form.get('sifre', '')
+        if sifre == ADMIN_SIFRE:
             session['admin'] = True
             return redirect('/admin')
-    return STYLE + "<div class='header'><a href='/'>Ana Sayfa</a></div>" + "<div class='content'><h2>🔐 Admin Girişi</h2><form method='post'>"
-    + "<input type='password' name='sifre' placeholder='Şifre' required>"
-    + "<button>Giriş Yap</button></form></div>"
+        else:
+            return STYLE + "<div class='header'><a href='/'>Ana Sayfa</a></div>" + "<div class='content'><h2 style='color:#ff4444;'>Yanlış şifre!</h2><a href='/admin_login'>Tekrar Dene</a></div>"
+    
+    html = STYLE + "<div class='header'><a href='/'>Ana Sayfa</a></div>"
+    html += "<div class='content'>"
+    html += "<h2>🔐 Admin Girişi</h2>"
+    html += "<p>Admin şifresi ile giriş yap.</p>"
+    html += "<form method='post'>"
+    html += "<input type='password' name='sifre' placeholder='Şifre' required autofocus>"
+    html += "<button>Giriş Yap</button>"
+    html += "</form>"
+    html += "</div>"
+    return html
 
 # Admin panel
 @app.route('/admin')
